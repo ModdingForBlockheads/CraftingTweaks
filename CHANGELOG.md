@@ -1,2 +1,2 @@
-- Updated to Minecraft 1.21.2
-- The Compress key now only works if the mod is installed on the server side 
+- Fixed refilling stack causing infinite loop on some recipes
+  - If you spot "Something went wrong trying to refill recipe. Too many iterations." in your log after installing this, let me know so that I can try to find the root cause
