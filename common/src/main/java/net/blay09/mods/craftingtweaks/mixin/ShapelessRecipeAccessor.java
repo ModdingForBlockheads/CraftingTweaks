@@ -11,5 +11,5 @@ import java.util.Optional;
 @Mixin(ShapelessRecipe.class)
 public interface ShapelessRecipeAccessor {
     @Accessor
-    List<Optional<Ingredient>> getIngredients();
+    List<Ingredient> getIngredients();
 }

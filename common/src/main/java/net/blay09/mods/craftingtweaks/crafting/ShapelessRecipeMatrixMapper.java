@@ -16,6 +16,6 @@ public class ShapelessRecipeMatrixMapper implements RecipeMapper<ShapelessRecipe
 
     @Override
     public List<Optional<Ingredient>> getIngredients(ShapelessRecipe recipe) {
-        return recipe instanceof ShapelessRecipeAccessor accessor ? accessor.getIngredients() : List.of();
+        return recipe instanceof ShapelessRecipeAccessor accessor ? accessor.getIngredients().stream().map(Optional::of).toList() : List.of();
     }
 }
