@@ -1,5 +1,6 @@
 package net.blay09.mods.craftingtweaks.api.impl;
 
+import net.blay09.mods.craftingtweaks.CraftingTweaks;
 import net.blay09.mods.craftingtweaks.api.CraftingGrid;
 import net.blay09.mods.craftingtweaks.api.CraftingTweaksAPI;
 import net.blay09.mods.craftingtweaks.api.GridRefillHandler;
@@ -33,6 +34,7 @@ public class DefaultGridRefillHandler implements GridRefillHandler<AbstractConta
             return;
         }
 
+        int operations = 0;
         outer:
         do {
             final var ingredientTokens = operation.getIngredientTokens();
@@ -63,7 +65,12 @@ public class DefaultGridRefillHandler implements GridRefillHandler<AbstractConta
                 final var itemStack = ingredientToken.consume();
                 craftMatrix.setItem(slot, itemStack.copyWithCount(itemStack.getCount() + slotStack.getCount()));
             });
-            if (!stack) {
+            operations++;
+            if (operations > 64) {
+                CraftingTweaks.logger.warn("Something went wrong trying to refill recipe. Too many iterations. Recipe: {}", recipeHolder.id().location());
+                break;
+            }
+            if (!stack || matrixDiff.isEmpty()) {
                 break;
             }
         } while (operation.prepare().canCraft());

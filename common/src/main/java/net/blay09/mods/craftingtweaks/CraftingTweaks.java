@@ -17,11 +17,15 @@ import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CraftingTweaks {
 
     public static final String MOD_ID = "craftingtweaks";
     public static boolean debugMode;
+
+    public static final Logger logger = LoggerFactory.getLogger(CraftingTweaks.class);
 
     public static boolean isServerSideInstalled = true;
 
