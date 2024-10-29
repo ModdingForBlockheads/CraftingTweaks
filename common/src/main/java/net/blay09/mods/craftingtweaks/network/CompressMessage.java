@@ -12,7 +12,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.inventory.RecipeCraftingHolder;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -23,7 +22,8 @@ import java.util.Objects;
 
 public class CompressMessage implements CustomPacketPayload {
 
-    public static CustomPacketPayload.Type<CompressMessage> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("craftingtweaks", "compress"));
+    public static CustomPacketPayload.Type<CompressMessage> TYPE = new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath("craftingtweaks",
+            "compress"));
 
     private final int slotNumber;
     private final CompressType type;
@@ -60,7 +60,7 @@ public class CompressMessage implements CustomPacketPayload {
             return;
         }
 
-        ItemStack mouseStack = mouseSlot.getItem();
+        ItemStack mouseStack = mouseSlot.getItem().copy();
         if (mouseStack.isEmpty()) {
             return;
         }
@@ -80,18 +80,23 @@ public class CompressMessage implements CustomPacketPayload {
                 }
 
                 ItemStack slotStack = slot.getItem();
-                if (slot.container instanceof Inventory && ItemStack.isSameItemSameComponents(slot.getItem(), mouseSlot.getItem())) {
+                if (slot.container instanceof Inventory && ItemStack.isSameItemSameComponents(slot.getItem(), mouseStack)) {
                     final var craftingContainer = new InventoryCraftingDecompress(menu, slotStack);
-                    ItemStack result = findMatchingResult(craftingContainer.asCraftInput(), craftingContainer, player);
+                    final var result = assembleResult(craftingContainer.asCraftInput(), craftingContainer, player);
                     if (!result.isEmpty() && !isBlacklisted(result) && !slotStack.isEmpty() && slotStack.getCount() >= 1) {
                         do {
-                            if (player.getInventory().add(result.copy())) {
+                            int suitableSlot = getSlotWithEnoughSpaceToFit(player.getInventory(), result);
+                            if (suitableSlot != -1) {
+                                if (!player.getInventory().add(result)) {
+                                    player.drop(result, true);
+                                }
                                 giveLeftoverItems(player, slotStack, 1);
                                 slot.remove(1);
                             } else {
                                 break;
                             }
-                        } while (decompressAll && slot.hasItem() && slotStack.getCount() >= 1 && slotStack.getItem() != result.getItem());
+                        } while (decompressAll && slot.hasItem() && slotStack.getCount() >= 1 && ItemStack.isSameItemSameComponents(slot.getItem(),
+                                mouseStack));
                     }
                 }
             }
@@ -103,6 +108,20 @@ public class CompressMessage implements CustomPacketPayload {
             }
         }
         menu.broadcastChanges();
+    }
+
+    private static int getSlotWithEnoughSpaceToFit(Inventory inventory, ItemStack result) {
+        int firstEmptySlot = -1;
+        for (int slot = 0; slot < Inventory.INVENTORY_SIZE; slot++) {
+            final var slotStack = inventory.getItem(slot);
+            if (slotStack.isEmpty() && firstEmptySlot == -1) {
+                firstEmptySlot = slot;
+            } else if (ItemStack.isSameItemSameComponents(slotStack,
+                    result) && slotStack.isStackable() && slotStack.getCount() + result.getCount() <= inventory.getMaxStackSize(slotStack)) {
+                return slot;
+            }
+        }
+        return firstEmptySlot;
     }
 
     private static void compressMouseSlot(ServerPlayer player, AbstractContainerMenu menu, Slot mouseSlot, CraftingGrid grid, boolean compressRequiresCraftingGrid, boolean wholeStack) {
@@ -166,7 +185,7 @@ public class CompressMessage implements CustomPacketPayload {
         }
     }
 
-    private static <T extends CraftingInput> ItemStack findMatchingResult(T recipeInput, RecipeCraftingHolder recipeCraftingHolder, ServerPlayer player) {
+    private static <T extends CraftingInput> ItemStack assembleResult(T recipeInput, RecipeCraftingHolder recipeCraftingHolder, ServerPlayer player) {
         RecipeManager recipeManager = Objects.requireNonNull(player.getServer()).getRecipeManager();
         Level level = player.level();
         RecipeHolder<CraftingRecipe> recipe = recipeManager.getRecipeFor(RecipeType.CRAFTING, recipeInput, level).orElse(null);
@@ -202,7 +221,7 @@ public class CompressMessage implements CustomPacketPayload {
 
         if (maxGridSize >= 9) {
             InventoryCraftingCompress exampleInventory = new InventoryCraftingCompress(menu, 3, exampleStack);
-            result = findMatchingResult(exampleInventory.asCraftInput(), exampleInventory, player);
+            result = assembleResult(exampleInventory.asCraftInput(), exampleInventory, player);
             if (!result.isEmpty() && !isBlacklisted(result)) {
                 recipeSize = 9;
             }
@@ -210,7 +229,7 @@ public class CompressMessage implements CustomPacketPayload {
 
         if (recipeSize == 0 && maxGridSize >= 4) {
             InventoryCraftingCompress exampleInventory = new InventoryCraftingCompress(menu, 2, exampleStack);
-            result = findMatchingResult(exampleInventory.asCraftInput(), exampleInventory, player);
+            result = assembleResult(exampleInventory.asCraftInput(), exampleInventory, player);
             if (!result.isEmpty() && !isBlacklisted(result)) {
                 recipeSize = 4;
             }
