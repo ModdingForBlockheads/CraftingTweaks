@@ -1,7 +1,5 @@
 package net.blay09.mods.craftingtweaks.crafting;
 
-import net.minecraft.core.Holder;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -12,7 +10,7 @@ import java.util.Map;
 
 public class CraftingContext {
 
-    private final Map<List<Holder<Item>>, Integer> cachedProviderIndexByIngredient = new HashMap<>();
+    private final Map<Ingredient, Integer> cachedProviderIndexByIngredient = new HashMap<>();
     private final Map<CraftingOperation.IngredientTokenKey, IngredientCacheHint> cacheHintsByIngredient = new HashMap<>();
 
     private final List<IngredientProvider> ingredientProviders;
@@ -30,7 +28,7 @@ public class CraftingContext {
     }
 
     public int getCachedIngredientProviderIndexFor(Ingredient ingredient) {
-        return cachedProviderIndexByIngredient.getOrDefault(ingredient.items(), -1);
+        return cachedProviderIndexByIngredient.getOrDefault(ingredient, -1);
     }
 
     public IngredientCacheHint getCacheHintFor(CraftingOperation.IngredientTokenKey ingredientTokenKey) {
@@ -39,6 +37,6 @@ public class CraftingContext {
 
     public void cache(CraftingOperation.IngredientTokenKey ingredientTokenKey, int itemProviderIndex, IngredientCacheHint cacheHint) {
         cacheHintsByIngredient.put(ingredientTokenKey, cacheHint);
-        cachedProviderIndexByIngredient.put(ingredientTokenKey.items(), itemProviderIndex);
+        cachedProviderIndexByIngredient.put(ingredientTokenKey.ingredient(), itemProviderIndex);
     }
 }
