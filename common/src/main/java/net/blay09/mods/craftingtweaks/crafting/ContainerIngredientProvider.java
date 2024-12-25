@@ -76,6 +76,7 @@ public class ContainerIngredientProvider implements IngredientProvider {
 
     public class ContainerIngredientToken implements IngredientToken, IngredientCacheHint {
         private final int slot;
+        private boolean returnRemainder;
 
         public ContainerIngredientToken(int slot) {
             this.slot = slot;
@@ -89,8 +90,10 @@ public class ContainerIngredientProvider implements IngredientProvider {
         @Override
         public ItemStack consume() {
             final var consumed = ContainerUtils.extractItem(container, slot, 1, false);
-            final var remainingItem = Balm.getHooks().getCraftingRemainingItem(consumed);
-            ContainerUtils.insertItem(container, slot, remainingItem, false);
+            if (returnRemainder) {
+                final var remainingItem = Balm.getHooks().getCraftingRemainingItem(consumed);
+                ContainerUtils.insertItem(container, slot, remainingItem, false);
+            }
             return consumed;
         }
 
