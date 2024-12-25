@@ -82,9 +82,13 @@ public class CompressMessage implements CustomPacketPayload {
                 ItemStack slotStack = slot.getItem();
                 if (slot.container instanceof Inventory && ItemStack.isSameItemSameComponents(slot.getItem(), mouseStack)) {
                     final var craftingContainer = new InventoryCraftingDecompress(menu, slotStack);
-                    final var result = assembleResult(craftingContainer.asCraftInput(), craftingContainer, player);
-                    if (!result.isEmpty() && !isBlacklisted(result) && !slotStack.isEmpty() && slotStack.getCount() >= 1) {
+                    if (!slotStack.isEmpty() && slotStack.getCount() >= 1) {
                         do {
+                            final var result = assembleResult(craftingContainer.asCraftInput(), craftingContainer, player);
+                            if (result.isEmpty() || isBlacklisted(result)) {
+                                break;
+                            }
+
                             int suitableSlot = getSlotWithEnoughSpaceToFit(player.getInventory(), result);
                             if (suitableSlot != -1) {
                                 if (!player.getInventory().add(result)) {
