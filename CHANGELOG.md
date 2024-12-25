@@ -1,3 +1,1 @@
-- Fixed refilling stack causing infinite loop on some recipes
-  - If you spot "Something went wrong trying to refill recipe. Too many iterations." in your log after installing this, let me know so that I can try to find the root cause
-- Fixed a bug when compressing / decompressing items
+- Fixed dupe bug
