@@ -1,1 +1,2 @@
+- Fixed item loss when decompressing a stack
 - Fixed dupe bug
