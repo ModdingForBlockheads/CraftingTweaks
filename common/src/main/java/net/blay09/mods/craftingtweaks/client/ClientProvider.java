@@ -26,8 +26,6 @@ import java.util.*;
 
 public class ClientProvider {
 
-    public static int CLICKS = 0;
-
     private final SimpleContainer lastCraftedMatrix = new SimpleContainer(9);
     private boolean hasLastCraftedMatrix;
 
@@ -57,27 +55,6 @@ public class ClientProvider {
         return Optional.empty();
     }
 
-    @Deprecated
-    public Optional<Slot> findFirstEmptySlotForItem(AbstractContainerMenu menu, ItemStack itemStack) {
-        for (final var slot : menu.slots) {
-            if (!slot.hasItem() && slot.mayPlace(itemStack)) {
-                return Optional.of(slot);
-            }
-        }
-        return Optional.empty();
-    }
-
-    @Deprecated
-    public List<Slot> findEmptySlotsForItem(AbstractContainerMenu menu, ItemStack itemStack) {
-        final var emptySlots = new ArrayList<Slot>();
-        menu.slots.forEach(slot -> {
-            if (!slot.hasItem() && slot.mayPlace(itemStack)) {
-                emptySlots.add(slot);
-            }
-        });
-        return emptySlots;
-    }
-
     public ArrayListMultimap<String, Slot> groupSlotsByItem(Player player, AbstractContainerMenu menu, CraftingGrid grid) {
         ArrayListMultimap<String, Slot> balanceSlots = ArrayListMultimap.create();
         int start = grid.getGridStartSlot(player, menu);
@@ -95,19 +72,7 @@ public class ClientProvider {
         return balanceSlots;
     }
 
-    public int getDistributionByItems(Collection<Slot> slots) {
-        int average = 0;
-        for (final var slot : slots) {
-            final var itemStack = slot.getItem();
-            if (!itemStack.isEmpty()) {
-                average += itemStack.getCount();
-            }
-        }
-        return (int) Math.floor((float) average / (float) slots.size());
-    }
-
     public void balanceGridNew(Player player, AbstractContainerMenu menu, CraftingGrid grid) {
-        CLICKS = 0;
         // Move stacks to buffer, smaller ones first, but leave the biggest one in recipe slots
         // If we were unable to do this, lay down in fetal position and cry because we can't balance this way. Undo everything. Or maybe try to check first so we don't have to undo. Or just leave it broken idk.
         // Balance the biggest one in the recipe slots (in order of the smallest recipe slot - on first iteration, all should be empty)
@@ -119,12 +84,12 @@ public class ClientProvider {
         for (final var key : slotsToBalance.keySet()) {
             final var recipeSlots = slotsToBalance.get(key);
             int gridStartSlot = grid.getGridStartSlot(player, menu);
-            final var gridBufferSlots = new ArrayList<>(menu.slots.subList(gridStartSlot, gridStartSlot + grid.getGridSize(player, menu)));
-            gridBufferSlots.removeAll(recipeSlots);
+            final var internalBufferSlots = new ArrayList<>(menu.slots.subList(gridStartSlot, gridStartSlot + grid.getGridSize(player, menu)));
+            internalBufferSlots.removeAll(recipeSlots);
             final var externalBufferSlots = new ArrayList<>(menu.slots);
             externalBufferSlots.removeIf(it -> it.getClass() != Slot.class);
             externalBufferSlots.removeAll(recipeSlots);
-            externalBufferSlots.removeAll(gridBufferSlots);
+            externalBufferSlots.removeAll(internalBufferSlots);
             // TODO Verify that we even have enough buffer space
 
             // Sort slots so we leave the biggest for last.
@@ -137,13 +102,16 @@ public class ClientProvider {
                 final var recipeSlot = recipeSlots.get(i);
                 final var itemStack = recipeSlot.getItem();
 
-                final var bufferSlotOpt = findFirstBufferSlotForItem(gridBufferSlots, externalBufferSlots, itemStack);
+                final var bufferSlotOpt = findFirstBufferSlotForItem(internalBufferSlots, externalBufferSlots, itemStack);
                 if (bufferSlotOpt.isPresent()) {
                     final var bufferSlot = bufferSlotOpt.get();
                     slotClick(menu, recipeSlot, player, 0, ClickType.PICKUP);
                     slotClick(menu, bufferSlot, player, 0, ClickType.PICKUP);
                     if (!slotsToSpread.contains(bufferSlot)) {
                         slotsToSpread.add(bufferSlot);
+                    }
+                    if (!internalBufferSlots.contains(bufferSlot)) {
+                        internalBufferSlots.add(bufferSlot);
                     }
                 } else {
                     CraftingTweaks.logger.warn("This is bad ... there was no buffer space for me to put the recipe item.");
@@ -181,12 +149,15 @@ public class ClientProvider {
                         return;
                     }
 
-                    final var bufferSlotOpt = findFirstBufferSlotForItem(gridBufferSlots, externalBufferSlots, leftoverMouseItem);
+                    final var bufferSlotOpt = findFirstBufferSlotForItem(internalBufferSlots, externalBufferSlots, leftoverMouseItem);
                     if (bufferSlotOpt.isPresent()) {
                         final var bufferSlot = bufferSlotOpt.get();
                         slotClick(menu, bufferSlot, player, 0, ClickType.PICKUP);
                         if (!slotsToSpread.contains(bufferSlot)) {
                             slotsToSpread.add(bufferSlot);
+                        }
+                        if (!internalBufferSlots.contains(bufferSlot)) {
+                            internalBufferSlots.add(bufferSlot);
                         }
                     } else {
                         CraftingTweaks.logger.warn("This is bad ... there was no space for me to put the leftover mouse item.");
@@ -208,7 +179,6 @@ public class ClientProvider {
     }
 
     public void balanceGrid(Player entityPlayer, AbstractContainerMenu container, CraftingGrid grid) {
-        CLICKS = 0;
         Multimap<String, Slot> balanceSlots = ArrayListMultimap.create();
         int start = grid.getGridStartSlot(entityPlayer, container);
         int size = grid.getGridSize(entityPlayer, container);

@@ -32,6 +32,9 @@ public class CraftingTweaksConfigData implements BalmConfigData {
         @Comment("We both know JEI is much better. This option hides Vanilla's crafting book button instead of moving it.")
         public boolean hideVanillaCraftingGuide = false;
 
+        @Comment("Use an alternative client-side balancing algorithm. It might be faster, or it might be slower, depending on the input. Try it if regular client-side balancing is causing lagspikes.")
+        public boolean hyperOptimizedClientsideBalancing = false;
+
         @Comment("Set to 'DEFAULT' to enable both buttons and hotkeys. Set to 'BUTTONS' to enable buttons only. Set to 'HOTKEYS' to enable hotkeys only. Set to 'DISABLED' to disable completely.")
         public CraftingTweaksMode mode = CraftingTweaksMode.DEFAULT;
 

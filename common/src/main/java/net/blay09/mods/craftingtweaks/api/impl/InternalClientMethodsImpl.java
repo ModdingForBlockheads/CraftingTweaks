@@ -7,10 +7,13 @@ import net.blay09.mods.craftingtweaks.client.ClientProvider;
 import net.blay09.mods.craftingtweaks.client.CraftingTweaksClient;
 import net.blay09.mods.craftingtweaks.client.CraftingTweaksClientProviderManager;
 import net.blay09.mods.craftingtweaks.client.GuiTweakButton;
+import net.blay09.mods.craftingtweaks.config.CraftingTweaksConfig;
+import net.blay09.mods.craftingtweaks.config.CraftingTweaksConfigData;
 import net.blay09.mods.craftingtweaks.network.BalanceMessage;
 import net.blay09.mods.craftingtweaks.network.ClearMessage;
 import net.blay09.mods.craftingtweaks.network.RotateMessage;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -42,7 +45,11 @@ public class InternalClientMethodsImpl implements InternalClientMethods {
                     if (tweak == TweakType.Spread) {
                         clientProvider.spreadGrid(player, container, grid);
                     } else {
-                        clientProvider.balanceGridNew(player, container, grid);
+                        if (CraftingTweaksConfig.getActive().client.hyperOptimizedClientsideBalancing) {
+                            clientProvider.balanceGridNew(player, container, grid);
+                        } else {
+                            clientProvider.balanceGrid(player, container, grid);
+                        }
                     }
                 }
             }
