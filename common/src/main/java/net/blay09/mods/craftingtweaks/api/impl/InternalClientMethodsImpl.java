@@ -42,7 +42,7 @@ public class InternalClientMethodsImpl implements InternalClientMethods {
                     if (tweak == TweakType.Spread) {
                         clientProvider.spreadGrid(player, container, grid);
                     } else {
-                        clientProvider.balanceGrid(player, container, grid);
+                        clientProvider.balanceGridNew(player, container, grid);
                     }
                 }
             }

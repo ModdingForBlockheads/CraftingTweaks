@@ -10,8 +10,12 @@ import net.blay09.mods.craftingtweaks.registry.JsonCompatLoader;
 import net.blay09.mods.craftingtweaks.network.HelloMessage;
 import net.blay09.mods.craftingtweaks.network.ModNetworking;
 import net.minecraft.resources.ResourceLocation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CraftingTweaks {
+
+    public static final Logger logger = LoggerFactory.getLogger(CraftingTweaks.class);
 
     public static final String MOD_ID = "craftingtweaks";
     public static boolean debugMode;

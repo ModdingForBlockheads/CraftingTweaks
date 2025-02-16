@@ -3,6 +3,7 @@ package net.blay09.mods.craftingtweaks.client;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import net.blay09.mods.craftingtweaks.CompressType;
+import net.blay09.mods.craftingtweaks.CraftingTweaks;
 import net.blay09.mods.craftingtweaks.api.CraftingGrid;
 import net.blay09.mods.craftingtweaks.config.CraftingTweaksConfig;
 import net.blay09.mods.craftingtweaks.InventoryCraftingCompress;
@@ -21,10 +22,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeType;
 
-import java.util.Collection;
-import java.util.Objects;
+import java.util.*;
 
 public class ClientProvider {
+
+    public static int CLICKS = 0;
 
     private final SimpleContainer lastCraftedMatrix = new SimpleContainer(9);
     private boolean hasLastCraftedMatrix;
@@ -33,7 +35,180 @@ public class ClientProvider {
         return Minecraft.getInstance().gameMode;
     }
 
+    public Optional<Slot> findFirstBufferSlotForItem(List<Slot> slots, List<Slot> externalSlots, ItemStack itemStack) {
+        for (final var slot : slots) {
+            if (slot.hasItem() && slot.mayPlace(itemStack) && ItemStack.isSameItemSameTags(itemStack, slot.getItem())) {
+                final var spaceLeft = slot.getMaxStackSize(slot.getItem()) - slot.getItem().getCount();
+                if (spaceLeft >= itemStack.getCount()) {
+                    return Optional.of(slot);
+                }
+            }
+        }
+        for (final var slot : slots) {
+            if (!slot.hasItem() && slot.mayPlace(itemStack)) {
+                return Optional.of(slot);
+            }
+        }
+        for (final var slot : externalSlots) {
+            if (!slot.hasItem() && slot.mayPlace(itemStack)) {
+                return Optional.of(slot);
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Deprecated
+    public Optional<Slot> findFirstEmptySlotForItem(AbstractContainerMenu menu, ItemStack itemStack) {
+        for (final var slot : menu.slots) {
+            if (!slot.hasItem() && slot.mayPlace(itemStack)) {
+                return Optional.of(slot);
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Deprecated
+    public List<Slot> findEmptySlotsForItem(AbstractContainerMenu menu, ItemStack itemStack) {
+        final var emptySlots = new ArrayList<Slot>();
+        menu.slots.forEach(slot -> {
+            if (!slot.hasItem() && slot.mayPlace(itemStack)) {
+                emptySlots.add(slot);
+            }
+        });
+        return emptySlots;
+    }
+
+    public ArrayListMultimap<String, Slot> groupSlotsByItem(Player player, AbstractContainerMenu menu, CraftingGrid grid) {
+        ArrayListMultimap<String, Slot> balanceSlots = ArrayListMultimap.create();
+        int start = grid.getGridStartSlot(player, menu);
+        int size = grid.getGridSize(player, menu);
+        for (int i = start; i < start + size; i++) {
+            Slot slot = menu.slots.get(i);
+            if (slot.hasItem()) {
+                ItemStack itemStack = slot.getItem();
+                if (!itemStack.isEmpty()) {
+                    ResourceLocation registryName = BuiltInRegistries.ITEM.getKey(itemStack.getItem());
+                    balanceSlots.put(Objects.toString(registryName), slot);
+                }
+            }
+        }
+        return balanceSlots;
+    }
+
+    public int getDistributionByItems(Collection<Slot> slots) {
+        int average = 0;
+        for (final var slot : slots) {
+            final var itemStack = slot.getItem();
+            if (!itemStack.isEmpty()) {
+                average += itemStack.getCount();
+            }
+        }
+        return (int) Math.floor((float) average / (float) slots.size());
+    }
+
+    public void balanceGridNew(Player player, AbstractContainerMenu menu, CraftingGrid grid) {
+        CLICKS = 0;
+        // Move stacks to buffer, smaller ones first, but leave the biggest one in recipe slots
+        // If we were unable to do this, lay down in fetal position and cry because we can't balance this way. Undo everything. Or maybe try to check first so we don't have to undo. Or just leave it broken idk.
+        // Balance the biggest one in the recipe slots (in order of the smallest recipe slot - on first iteration, all should be empty)
+        // If item is left over on mouse, put item into available buffer slot, smallest with space left first, or empty one
+        // If no buffer is available, place mouse onto the smallest stack in recipe slot.
+        // If that doesn't work either, just give up and leave the user with an annoying item on their mouse cursor like that Inventory Tweaks sorting bug.
+        // Now, pick next biggest stack from buffer and repeat the above!
+        final var slotsToBalance = groupSlotsByItem(player, menu, grid);
+        for (final var key : slotsToBalance.keySet()) {
+            final var recipeSlots = slotsToBalance.get(key);
+            int gridStartSlot = grid.getGridStartSlot(player, menu);
+            final var gridBufferSlots = new ArrayList<>(menu.slots.subList(gridStartSlot, gridStartSlot + grid.getGridSize(player, menu)));
+            gridBufferSlots.removeAll(recipeSlots);
+            final var externalBufferSlots = new ArrayList<>(menu.slots);
+            externalBufferSlots.removeIf(it -> it.getClass() != Slot.class);
+            externalBufferSlots.removeAll(recipeSlots);
+            externalBufferSlots.removeAll(gridBufferSlots);
+            // TODO Verify that we even have enough buffer space
+
+            // Sort slots so we leave the biggest for last.
+            recipeSlots.sort(Comparator.comparingInt(o -> o.getItem().getCount()));
+
+            final var slotsToSpread = new ArrayList<Slot>();
+
+            // Start by moving all except the biggest to available buffer slots.
+            for (int i = 0; i < recipeSlots.size() - 1; i++) {
+                final var recipeSlot = recipeSlots.get(i);
+                final var itemStack = recipeSlot.getItem();
+
+                final var bufferSlotOpt = findFirstBufferSlotForItem(gridBufferSlots, externalBufferSlots, itemStack);
+                if (bufferSlotOpt.isPresent()) {
+                    final var bufferSlot = bufferSlotOpt.get();
+                    slotClick(menu, recipeSlot, player, 0, ClickType.PICKUP);
+                    slotClick(menu, bufferSlot, player, 0, ClickType.PICKUP);
+                    if (!slotsToSpread.contains(bufferSlot)) {
+                        slotsToSpread.add(bufferSlot);
+                    }
+                } else {
+                    CraftingTweaks.logger.warn("This is bad ... there was no buffer space for me to put the recipe item.");
+                    return;
+                }
+            }
+
+            slotsToSpread.add(recipeSlots.get(recipeSlots.size() - 1));
+
+            while (!slotsToSpread.isEmpty()) {
+                final var biggestSlotToSpread = slotsToSpread.remove(slotsToSpread.size() - 1);
+                slotClick(menu, biggestSlotToSpread, player, 0, ClickType.PICKUP);
+                if (biggestSlotToSpread.hasItem()) {
+                    CraftingTweaks.logger.warn("This is bad ... clicking the slot to spread did not pick it up fully.");
+                    return;
+                }
+
+                final var mouseItemBeforeSpread = menu.getCarried().copy();
+                if (mouseItemBeforeSpread.getCount() == 1) {
+                    slotClick(menu, recipeSlots.get(0), player, 0, ClickType.PICKUP);
+                } else {
+                    slotClick(menu, -999, player, AbstractContainerMenu.getQuickcraftMask(0, 0), ClickType.QUICK_CRAFT);
+                    recipeSlots.sort(Comparator.comparingInt(o -> o.getItem().getCount()));
+                    for (final var recipeDropSlot : recipeSlots) {
+                        slotClick(menu, recipeDropSlot, player, AbstractContainerMenu.getQuickcraftMask(1, 0), ClickType.QUICK_CRAFT);
+                    }
+                    slotClick(menu, -999, player, AbstractContainerMenu.getQuickcraftMask(2, 0), ClickType.QUICK_CRAFT);
+                }
+
+                final var leftoverMouseItem = menu.getCarried();
+                if (!leftoverMouseItem.isEmpty()) {
+                    if (ItemStack.isSameItemSameTags(leftoverMouseItem,
+                            mouseItemBeforeSpread) && leftoverMouseItem.getCount() >= mouseItemBeforeSpread.getCount()) {
+                        CraftingTweaks.logger.warn("This is bad ... spreading the item didn't change my mouse item.");
+                        return;
+                    }
+
+                    final var bufferSlotOpt = findFirstBufferSlotForItem(gridBufferSlots, externalBufferSlots, leftoverMouseItem);
+                    if (bufferSlotOpt.isPresent()) {
+                        final var bufferSlot = bufferSlotOpt.get();
+                        slotClick(menu, bufferSlot, player, 0, ClickType.PICKUP);
+                        if (!slotsToSpread.contains(bufferSlot)) {
+                            slotsToSpread.add(bufferSlot);
+                        }
+                    } else {
+                        CraftingTweaks.logger.warn("This is bad ... there was no space for me to put the leftover mouse item.");
+                        return;
+                    }
+                }
+
+                slotsToSpread.sort(Comparator.comparingInt(o -> o.getItem().getCount()));
+            }
+        }
+    }
+
+    public void slotClick(AbstractContainerMenu menu, Slot slot, Player player, int button, ClickType clickType) {
+        getController().handleInventoryMouseClick(menu.containerId, slot.index, button, clickType, player);
+    }
+
+    public void slotClick(AbstractContainerMenu menu, int slotId, Player player, int button, ClickType clickType) {
+        getController().handleInventoryMouseClick(menu.containerId, slotId, button, clickType, player);
+    }
+
     public void balanceGrid(Player entityPlayer, AbstractContainerMenu container, CraftingGrid grid) {
+        CLICKS = 0;
         Multimap<String, Slot> balanceSlots = ArrayListMultimap.create();
         int start = grid.getGridStartSlot(entityPlayer, container);
         int size = grid.getGridSize(entityPlayer, container);
